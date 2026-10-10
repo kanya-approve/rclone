@@ -368,7 +368,7 @@ func (vfs *VFS) SetCacheMode(cacheMode vfscommon.CacheMode) {
 	vfs.cache = nil
 	if cacheMode > vfscommon.CacheModeOff {
 		ctx, cancel := context.WithCancel(vfs.ctx)
-		cache, err := vfscache.New(ctx, vfs.f, &vfs.Opt, vfs.AddVirtual)
+		cache, err := vfscache.New(ctx, vfs.f, &vfs.Opt, vfs.AddVirtual, totalCacheUsed)
 		if err != nil {
 			fs.Errorf(nil, "Failed to create vfs cache - disabling: %v", err)
 			vfs.Opt.CacheMode = vfscommon.CacheModeOff
@@ -897,6 +897,18 @@ func (vfs *VFS) AddVirtual(remote string, size int64, isDir bool) (err error) {
 	}
 	dir.AddVirtual(leaf, size, false)
 	return nil
+}
+
+// totalCacheUsed returns the total size used by VFS caches
+func totalCacheUsed() (size int64) {
+	activeMu.Lock()
+	for _, vfses := range active {
+		for _, vfs := range vfses {
+			size += vfs.cache.Used()
+		}
+	}
+	activeMu.Unlock()
+	return size
 }
 
 // Readlink returns the destination of the named symbolic link.
